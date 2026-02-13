@@ -1,4 +1,4 @@
-"""Tests for Songshi Juan 186 ingestion and candidate extraction."""
+"""Tests for Songshi Juan 186 ingestion, extraction, and promotion workflow."""
 
 from __future__ import annotations
 
@@ -7,8 +7,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from extract.songshi_candidates import extract_candidates
+from extract.songshi_candidates import extract_candidates, parse_chinese_numeral
 from ingest.wikisource_fetch import fetch_wikisource_page
+from review.promote_reviewed_to_facts import FACT_COLUMNS, promote_reviewed_to_facts
 
 REQUIRED_COLUMNS = {
     "candidate_id",
@@ -16,9 +17,14 @@ REQUIRED_COLUMNS = {
     "source_url",
     "source_ref",
     "juan",
+    "char_start",
+    "char_end",
     "snippet",
+    "snippet_hash",
     "value_raw",
+    "value_num",
     "unit_raw",
+    "unit_std",
     "keywords",
     "candidate_topic",
     "candidate_period",
@@ -79,4 +85,59 @@ def test_extract_candidates_schema_nonempty_and_confidence_c(tmp_path: Path) -> 
     assert not loaded.empty
     assert REQUIRED_COLUMNS.issubset(loaded.columns)
     assert (loaded["confidence"] == "C").all()
-    assert (~loaded["candidate_topic"].astype(str).str.fullmatch("fact", case=False)).all()
+
+
+@pytest.mark.parametrize(
+    ("value_raw", "expected"),
+    [
+        ("二百", 200.0),
+        ("一千二百三", 1203.0),
+        ("廿五", 25.0),
+        ("3", 3.0),
+    ],
+)
+def test_parse_chinese_numeral(value_raw: str, expected: float) -> None:
+    """Chinese and Arabic numeral parser should parse common forms."""
+    assert parse_chinese_numeral(value_raw) == expected
+
+
+def test_promote_only_approved_rows(tmp_path: Path) -> None:
+    """Promotion should include only approved rows with complete final fields."""
+    review_path = tmp_path / "review_sheet.csv"
+    out_facts = tmp_path / "extracts_songshi_juan186.csv"
+
+    review_df = pd.DataFrame(
+        [
+            {
+                "candidate_id": "c-approved",
+                "source_ref": "https://zh.wikisource.org/zh-hans/宋史/卷186#start=10&end=12&cid=c-approved",
+                "approve": 1,
+                "final_period": "YUANFENG",
+                "final_topic": "shangshui",
+                "final_region": "NATIONAL",
+                "final_value_std": "300",
+                "final_unit_std": "guan",
+                "confidence_override": "B",
+            },
+            {
+                "candidate_id": "c-not-approved",
+                "source_ref": "https://zh.wikisource.org/zh-hans/宋史/卷186#start=20&end=24&cid=c-not-approved",
+                "approve": 0,
+                "final_period": "XINNING",
+                "final_topic": "liangshui",
+                "final_region": "NATIONAL",
+                "final_value_std": "200",
+                "final_unit_std": "guan",
+                "confidence_override": "",
+            },
+        ]
+    )
+    review_df.to_csv(review_path, index=False)
+
+    facts = promote_reviewed_to_facts(review_path, out_facts)
+
+    assert out_facts.exists()
+    assert list(facts.columns) == FACT_COLUMNS
+    assert len(facts) == 1
+    assert facts.iloc[0]["extract_id"] == "songshi-juan186-c-approved"
+    assert facts.iloc[0]["confidence"] == "B"

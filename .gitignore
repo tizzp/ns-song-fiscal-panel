@@ -5,6 +5,7 @@ __pycache__/
 
 # Generated ingestion outputs
 /data/01_raw/wikisource/
+/data/01_raw/extracts_songshi_juan186.csv
 
 # Generated pipeline outputs
 /data/02_intermediate/*

@@ -28,6 +28,8 @@ dev = [
 [project.scripts]
 run-song-pipeline = "pipeline_end_to_end:run_pipeline"
 run-songshi-juan186 = "ingest_songshi_juan186:main"
+run-songshi-juan186-review = "review.make_review_sheet:main"
+run-songshi-juan186-promote = "review.promote_reviewed_to_facts:main"
 
 [tool.pytest.ini_options]
 pythonpath = [

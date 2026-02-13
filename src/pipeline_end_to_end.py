@@ -29,7 +29,8 @@ EXPECTED_TOPIC_COLUMNS: Final[list[str]] = [
 ]
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parents[1]
-RAW_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_seed.csv"
+SEED_RAW_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_seed.csv"
+FACTS_RAW_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_songshi_juan186.csv"
 INTERMEDIATE_PATH: Final[Path] = (
     BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
 )
@@ -114,9 +115,16 @@ def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
     return panel
 
 
+def _select_extracts_path() -> Path:
+    """Select promoted facts when available; otherwise fallback to seed extracts."""
+    if FACTS_RAW_PATH.exists() and FACTS_RAW_PATH.stat().st_size > 0:
+        return FACTS_RAW_PATH
+    return SEED_RAW_PATH
+
+
 def run_pipeline() -> pd.DataFrame:
-    """Execute pipeline from seed extracts to panel output."""
-    extracts = pd.read_csv(RAW_PATH)
+    """Execute pipeline from available extracts to panel output."""
+    extracts = pd.read_csv(_select_extracts_path())
     validate_columns(extracts)
     validate_rows(extracts)
 

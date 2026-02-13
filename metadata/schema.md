@@ -1,35 +1,42 @@
 # Schema reference
 
-## Input facts table (`extracts_seed.csv`)
+## Facts table used by panel pipeline
 
-Required columns:
+Primary facts schema (`extracts_seed.csv` or promoted `extracts_songshi_juan186.csv`):
 
-- `extract_id` (string): unique id for a source extract row.
-- `period` (string): one of XINNING, YUANFENG, SHAOSHENG, HUIZONG.
-- `region` (string): one of NATIONAL, NORTH, SOUTH.
-- `topic` (string): one of revenue_total, liangshui, shangshui.
-- `value` (number): numeric value extracted from source.
-- `unit` (string): measurement unit (placeholder uses `guan`).
-- `confidence` (string): evidence confidence grade (placeholder must be `C`).
+- `extract_id` (string): unique id for a facts row.
+- `period` (string): e.g., XINNING, YUANFENG, SHAOSHENG, HUIZONG.
+- `region` (string): NATIONAL, NORTH, SOUTH, or approved value.
+- `topic` (string): e.g., revenue_total, liangshui, shangshui.
+- `value` (number): numeric value.
+- `unit` (string): unit label.
+- `confidence` (string): confidence grade (`C` default unless reviewed override).
 - `source_ref` (string): source evidence pointer.
 
-### Recommended `source_ref` structure
+## Candidate extraction table (Songshi Juǎn 186)
 
-Use a structured pointer so humans can trace each row quickly:
+`candidates_songshi_juan186.csv` columns:
 
-- Format: `book:<book_id>|locator:<locator_text>`
-- Example: `book:SongShi-ZhiShiHuo|locator:juan-173-folio-12b`
+- `candidate_id`, `source_work`, `source_url`, `source_ref`
+- `juan`, `char_start`, `char_end`, `snippet`, `snippet_hash`
+- `value_raw`, `value_num`, `unit_raw`, `unit_std`
+- `keywords`, `candidate_topic`, `candidate_period`, `region`
+- `confidence`, `notes`
 
-For placeholder seed rows only, `placeholder://...` values are allowed.
-Real extract rows should use book + locator format.
+Candidate defaults and boundary:
 
-## Output panel (`panel_revenue_period_region.csv`)
+- Candidates are provisional; `confidence` defaults to `C`.
+- Candidates are not facts until explicitly approved in review sheet.
 
-- Primary key: (`period`, `region`).
-- Base topic columns: `revenue_total`, `liangshui`, `shangshui`.
-- Derived columns:
-  - `share_liangshui_in_total` = liangshui / revenue_total
-  - `share_shangshui_in_total` = shangshui / revenue_total
-- Share behavior:
-  - If `revenue_total > 0`, shares are finite values in `[0, 1]`.
-  - If `revenue_total <= 0`, shares are `NaN` (never `inf`).
+## Review sheet columns
+
+`candidates_songshi_juan186_review_sheet.csv` keeps all candidate columns and adds:
+
+- `approve` (0/1)
+- `final_period`, `final_topic`, `final_region`
+- `final_value_std`, `final_unit_std`
+- `interpretation_note`, `confidence_override`
+
+Promotion rule:
+
+- Only `approve == 1` rows with complete `final_*` fields are promoted to facts.
