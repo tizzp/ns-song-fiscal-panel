@@ -3,15 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import ast
-from typing import Any
-
-import pandas as pd
-
-try:
-    import yaml
-except ImportError:  # pragma: no cover - optional runtime dependency in offline envs
-    yaml = None  # type: ignore[assignment]
 from typing import Any
 
 import pandas as pd
@@ -40,50 +31,6 @@ AUTO_FACT_COLUMNS = [
 
 def _load_rules(rules_path: Path) -> dict[str, Any]:
     """Load YAML rules for era/topic/region mapping."""
-    content = rules_path.read_text(encoding="utf-8")
-    if yaml is not None:
-        return yaml.safe_load(content)
-
-    parsed: dict[str, dict[str, list[str]]] = {
-        "era_keywords": {},
-        "topic_keywords": {},
-        "region_keywords": {},
-    }
-    section = ""
-    label = ""
-
-    for raw_line in content.splitlines():
-        line = raw_line.rstrip()
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-
-        indent = len(line) - len(line.lstrip(" "))
-        if indent == 0 and stripped.endswith(":"):
-            key = stripped[:-1]
-            if key in parsed:
-                section = key
-            continue
-
-        if indent == 2 and section:
-            if ":" not in stripped:
-                continue
-            key_part, value_part = stripped.split(":", 1)
-            label = key_part.strip()
-            value_part = value_part.strip()
-            parsed[section][label] = []
-            if value_part.startswith("[") and value_part.endswith("]"):
-                parsed_list = ast.literal_eval(value_part)
-                parsed[section][label] = [str(item) for item in parsed_list]
-                label = ""
-            continue
-
-        if indent >= 4 and stripped.startswith("-") and section and label:
-            value = stripped[1:].strip().strip('"').strip("'")
-            if value:
-                parsed[section][label].append(value)
-
-    return parsed
     return yaml.safe_load(rules_path.read_text(encoding="utf-8"))
 
 
