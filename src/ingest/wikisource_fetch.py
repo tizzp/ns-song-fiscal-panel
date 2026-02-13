@@ -16,6 +16,9 @@ try:
 except ImportError:  # pragma: no cover - optional runtime dependency in offline envs
     BeautifulSoup = None  # type: ignore[assignment]
 
+import requests
+from bs4 import BeautifulSoup
+
 DEFAULT_USER_AGENT = "ns-song-fiscal-panel/0.1 (+https://github.com/tizzp/ns-song-fiscal-panel)"
 
 
@@ -79,6 +82,14 @@ def fetch_wikisource_page(
     time.sleep(max(sleep_seconds, 0.0))
 
     html = _download_html(url)
+    response = requests.get(
+        url,
+        timeout=30,
+        headers={"User-Agent": DEFAULT_USER_AGENT},
+    )
+    response.raise_for_status()
+
+    html = response.text
     out_html.write_text(html, encoding="utf-8")
 
     text = _extract_readable_text(html)

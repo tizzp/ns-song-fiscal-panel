@@ -35,6 +35,14 @@ REQUIRED_CANDIDATE_COLUMNS = {
 }
 
 
+class _DummyResponse:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        return None
+
+
 def test_fetch_creates_nonempty_txt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Fetcher should write non-empty plain text output."""
     fixture_html = Path("tests/fixtures/juan186_sample.html").read_text(encoding="utf-8")
@@ -44,6 +52,10 @@ def test_fetch_creates_nonempty_txt(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         return fixture_html
 
     monkeypatch.setattr("ingest.wikisource_fetch._download_html", _fake_download_html)
+    def _fake_get(*args: object, **kwargs: object) -> _DummyResponse:
+        return _DummyResponse(fixture_html)
+
+    monkeypatch.setattr("ingest.wikisource_fetch.requests.get", _fake_get)
 
     out_html = tmp_path / "juan186.html"
     out_txt = tmp_path / "juan186.txt"

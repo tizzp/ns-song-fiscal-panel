@@ -12,6 +12,10 @@ try:
     import yaml
 except ImportError:  # pragma: no cover - optional runtime dependency in offline envs
     yaml = None  # type: ignore[assignment]
+from typing import Any
+
+import pandas as pd
+import yaml
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 CANDIDATES_PATH = BASE_DIR / "data" / "02_intermediate" / "candidates_songshi_juan186.csv"
@@ -80,6 +84,7 @@ def _load_rules(rules_path: Path) -> dict[str, Any]:
                 parsed[section][label].append(value)
 
     return parsed
+    return yaml.safe_load(rules_path.read_text(encoding="utf-8"))
 
 
 def _match_first(text: str, mapping: dict[str, list[str]]) -> tuple[str, str]:

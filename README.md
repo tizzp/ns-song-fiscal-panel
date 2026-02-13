@@ -89,6 +89,8 @@ This command runs the **verified** mode and keeps compatibility with older flows
 - If no conservative region keyword is found, region remains `unknown` and is excluded from auto panel.
 - Auto-facts are emitted only when period/topic/value are safely available.
 - Region inference is provisional and should be treated as a review candidate, not publication-ready fact.
+- Region defaults to `unknown`; auto panel includes only `NATIONAL` rows.
+- Auto-facts are emitted only when period/topic/value are safely available.
 
 ## Tests
 
