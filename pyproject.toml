@@ -17,6 +17,7 @@ dependencies = [
   "pydantic>=2.5.0",
   "requests>=2.31.0",
   "beautifulsoup4>=4.12.0",
+  "PyYAML>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -28,8 +29,12 @@ dev = [
 [project.scripts]
 run-song-pipeline = "pipeline_end_to_end:run_pipeline"
 run-songshi-juan186 = "ingest_songshi_juan186:main"
+run-songshi-juan186-ingest = "songshi_juan186_workflow:run_songshi_juan186_ingest"
+run-songshi-juan186-auto = "songshi_juan186_workflow:run_songshi_juan186_auto"
 run-songshi-juan186-review = "review.make_review_sheet:main"
 run-songshi-juan186-promote = "review.promote_reviewed_to_facts:main"
+run-songshi-juan186-verified = "songshi_juan186_workflow:run_songshi_juan186_verified"
+run-songshi-juan186-all = "songshi_juan186_workflow:run_songshi_juan186_all"
 
 [tool.pytest.ini_options]
 pythonpath = [
@@ -57,6 +62,7 @@ select = [
 py-modules = [
   "pipeline_end_to_end",
   "ingest_songshi_juan186",
+  "songshi_juan186_workflow",
 ]
 
 [tool.setuptools.packages.find]

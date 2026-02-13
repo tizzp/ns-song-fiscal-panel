@@ -144,10 +144,16 @@ def _detect_period(context: str) -> str:
     return "unknown"
 
 
-def _detect_unit(context: str) -> str:
-    """Detect the first matched unit in local context."""
+def _detect_unit(text: str, start: int, end: int) -> str:
+    """Detect unit by checking right-adjacent text first, then local window."""
+    right_slice = text[end : min(len(text), end + 3)]
     for token in UNIT_MAP:
-        if token in context:
+        if right_slice.startswith(token):
+            return token
+
+    local = text[max(0, start - 10) : min(len(text), end + 10)]
+    for token in UNIT_MAP:
+        if token in local:
             return token
     return ""
 
@@ -229,7 +235,7 @@ def extract_candidates(txt_path: Path, out_csv: Path, source_ref: str) -> pd.Dat
         found_keywords = _detect_keywords(local_context)
         topic = _detect_topic(found_keywords)
         period = _detect_period(local_context)
-        unit_raw = _detect_unit(local_context)
+        unit_raw = _detect_unit(text, start, end)
         unit_std = _standardize_unit(unit_raw)
 
         candidate_id = _candidate_id(source_ref, start, end, value_raw)

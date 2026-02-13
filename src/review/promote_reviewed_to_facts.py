@@ -71,7 +71,7 @@ def promote_reviewed_to_facts(input_csv: Path, output_csv: Path) -> pd.DataFrame
 
         rows.append(
             {
-                "extract_id": f"songshi-juan186-{row['candidate_id']}",
+                "extract_id": f"songshi-juan186-{row.get('candidate_id', row.get('extract_id', 'unknown'))}",
                 "period": str(row["final_period"]).strip(),
                 "region": str(row["final_region"]).strip(),
                 "topic": str(row["final_topic"]).strip(),

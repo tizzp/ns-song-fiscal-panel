@@ -1,101 +1,85 @@
-"""Tests for end-to-end Song fiscal panel pipeline."""
+"""Tests for auto and verified panel generation."""
 
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import pandas as pd
 
-from pipeline_end_to_end import INTERMEDIATE_PATH, PANEL_PATH, compute_panel, run_pipeline
-
-REQUIRED_PANEL_COLUMNS = {
-    "period",
-    "region",
-    "revenue_total",
-    "liangshui",
-    "shangshui",
-    "share_liangshui_in_total",
-    "share_shangshui_in_total",
-}
-
-SHARE_COLUMNS = [
-    "share_liangshui_in_total",
-    "share_shangshui_in_total",
-]
+from pipeline_end_to_end import run_panel_mode
 
 
-def test_run_pipeline_executes_and_outputs_exist() -> None:
-    """Pipeline run should succeed and create both output files."""
-    panel = run_pipeline()
+def test_auto_panel_uniqueness_and_share_bounds(tmp_path: Path, monkeypatch) -> None:
+    """Auto panel should have unique keys and valid share behavior."""
+    auto_facts_path = tmp_path / "auto_facts.csv"
+    auto_panel_path = tmp_path / "auto_panel.csv"
 
-    assert not panel.empty
-    assert REQUIRED_PANEL_COLUMNS.issubset(set(panel.columns))
-    assert INTERMEDIATE_PATH.exists()
-    assert PANEL_PATH.exists()
-
-
-def test_period_region_primary_key_uniqueness() -> None:
-    """(period, region) must be unique in output panel."""
-    run_pipeline()
-    panel = pd.read_csv(PANEL_PATH)
-
-    duplicates = panel.duplicated(subset=["period", "region"])
-    assert not duplicates.any()
-
-
-def test_share_columns_respect_bounds_when_revenue_positive() -> None:
-    """Shares must be in [0, 1] for rows with strictly positive revenue_total."""
-    run_pipeline()
-    panel = pd.read_csv(PANEL_PATH)
-
-    positive_revenue = panel["revenue_total"] > 0
-    for column in SHARE_COLUMNS:
-        assert panel.loc[positive_revenue, column].between(0, 1, inclusive="both").all()
-
-
-def test_share_columns_are_nan_when_revenue_not_positive_and_never_inf() -> None:
-    """Shares should be NaN when revenue_total <= 0 and must never be infinite."""
-    extracts = pd.DataFrame(
+    auto_facts = pd.DataFrame(
         [
             {
-                "extract_id": "t-001",
+                "extract_id": "a-1",
                 "period": "XINNING",
                 "region": "NATIONAL",
                 "topic": "revenue_total",
-                "value": 0.0,
+                "value": 100.0,
                 "unit": "guan",
                 "confidence": "C",
-                "source_ref": "placeholder://seed/test/revenue",
+                "review_status": "unreviewed",
+                "source_ref": "u#1",
+                "rule_trace": "period:熙宁|topic:課入|region:京師",
             },
             {
-                "extract_id": "t-002",
+                "extract_id": "a-2",
                 "period": "XINNING",
                 "region": "NATIONAL",
                 "topic": "liangshui",
-                "value": 5.0,
+                "value": 20.0,
                 "unit": "guan",
                 "confidence": "C",
-                "source_ref": "placeholder://seed/test/liangshui",
+                "review_status": "unreviewed",
+                "source_ref": "u#2",
+                "rule_trace": "period:熙宁|topic:兩稅",
             },
             {
-                "extract_id": "t-003",
+                "extract_id": "a-3",
                 "period": "XINNING",
                 "region": "NATIONAL",
                 "topic": "shangshui",
-                "value": 3.0,
+                "value": 10.0,
                 "unit": "guan",
                 "confidence": "C",
-                "source_ref": "placeholder://seed/test/shangshui",
+                "review_status": "unreviewed",
+                "source_ref": "u#3",
+                "rule_trace": "period:熙宁|topic:商税",
             },
         ]
     )
+    auto_facts.to_csv(auto_facts_path, index=False)
 
-    panel = compute_panel(extracts)
-    row = panel.iloc[0]
+    monkeypatch.setattr("pipeline_end_to_end.AUTO_FACTS_PATH", auto_facts_path)
+    monkeypatch.setattr("pipeline_end_to_end.AUTO_PANEL_PATH", auto_panel_path)
 
-    for column in SHARE_COLUMNS:
-        assert pd.isna(row[column])
+    panel = run_panel_mode("auto")
 
-    for column in SHARE_COLUMNS:
-        non_null = panel[column].dropna()
-        assert not non_null.map(math.isinf).any()
+    assert not panel.empty
+    assert not panel.duplicated(subset=["period", "region"]).any()
+
+    positive_revenue = panel["revenue_total"] > 0
+    for column in ["share_liangshui_in_total", "share_shangshui_in_total"]:
+        assert panel.loc[positive_revenue, column].between(0, 1, inclusive="both").all()
+        assert not panel[column].dropna().map(math.isinf).any()
+
+
+def test_verified_panel_empty_when_no_approved_facts(tmp_path: Path, monkeypatch) -> None:
+    """Verified mode should not crash and may emit an empty panel."""
+    verified_facts = tmp_path / "missing_verified.csv"
+    verified_panel = tmp_path / "verified_panel.csv"
+
+    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_FACTS_PATH", verified_facts)
+    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_PANEL_PATH", verified_panel)
+
+    panel = run_panel_mode("verified")
+
+    assert panel.empty
+    assert verified_panel.exists()

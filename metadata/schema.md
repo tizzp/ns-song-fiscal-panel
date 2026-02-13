@@ -1,42 +1,43 @@
 # Schema reference
 
-## Facts table used by panel pipeline
+## Candidate extraction output
 
-Primary facts schema (`extracts_seed.csv` or promoted `extracts_songshi_juan186.csv`):
+`data/02_intermediate/candidates_songshi_juan186.csv`:
 
-- `extract_id` (string): unique id for a facts row.
-- `period` (string): e.g., XINNING, YUANFENG, SHAOSHENG, HUIZONG.
-- `region` (string): NATIONAL, NORTH, SOUTH, or approved value.
-- `topic` (string): e.g., revenue_total, liangshui, shangshui.
-- `value` (number): numeric value.
-- `unit` (string): unit label.
-- `confidence` (string): confidence grade (`C` default unless reviewed override).
-- `source_ref` (string): source evidence pointer.
-
-## Candidate extraction table (Songshi Juǎn 186)
-
-`candidates_songshi_juan186.csv` columns:
-
-- `candidate_id`, `source_work`, `source_url`, `source_ref`
+- `candidate_id`
+- `source_work`, `source_url`, `source_ref`
 - `juan`, `char_start`, `char_end`, `snippet`, `snippet_hash`
 - `value_raw`, `value_num`, `unit_raw`, `unit_std`
 - `keywords`, `candidate_topic`, `candidate_period`, `region`
 - `confidence`, `notes`
 
-Candidate defaults and boundary:
+Rules:
 
-- Candidates are provisional; `confidence` defaults to `C`.
-- Candidates are not facts until explicitly approved in review sheet.
+- Candidate rows are provisional and default to `confidence=C`.
+- `source_ref` must include URL + character offsets + candidate id.
 
-## Review sheet columns
+## Auto-facts output (provisional)
 
-`candidates_songshi_juan186_review_sheet.csv` keeps all candidate columns and adds:
+`data/02_intermediate/auto_facts_songshi_juan186.csv`:
 
-- `approve` (0/1)
-- `final_period`, `final_topic`, `final_region`
-- `final_value_std`, `final_unit_std`
-- `interpretation_note`, `confidence_override`
+- `extract_id`
+- `period` (`XINNING|YUANFENG|SHAOSHENG|HUIZONG|unknown`)
+- `region` (`NATIONAL|NORTH|SOUTH|unknown`)
+- `topic` (`revenue_total|liangshui|shangshui|unknown`)
+- `value` (float)
+- `unit` (standardized unit or `unknown`)
+- `confidence` (always `C`)
+- `review_status` (always `unreviewed`)
+- `source_ref`
+- `rule_trace`
 
-Promotion rule:
+## Verified facts output
 
-- Only `approve == 1` rows with complete `final_*` fields are promoted to facts.
+`data/01_raw/extracts_songshi_juan186.csv` (only from approved review rows):
+
+- `extract_id`, `period`, `region`, `topic`, `value`, `unit`, `confidence`, `source_ref`
+
+## Panels
+
+- Auto panel: `data/03_primary/panel_revenue_period_region_auto.csv` (provisional)
+- Verified panel: `data/03_primary/panel_revenue_period_region_verified.csv` (approved facts path)

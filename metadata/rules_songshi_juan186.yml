@@ -1,0 +1,20 @@
+era_keywords:
+  XINNING: ["熙宁", "熙寧"]
+  YUANFENG: ["元丰", "元豐"]
+  SHAOSHENG: ["绍圣", "紹聖"]
+  HUIZONG: ["徽宗", "崇宁", "崇寧", "大观", "大觀", "政和"]
+
+topic_keywords:
+  shangshui: ["商税", "商稅", "市舶", "舶", "互市", "市易", "均输", "均輸"]
+  liangshui: ["两税", "兩稅"]
+  revenue_total: ["总税", "總稅", "诸色课入", "諸色課入", "课入", "課入"]
+  grain: ["籴", "糴", "漕", "漕运", "漕運", "京师", "京師", "边", "邊"]
+
+region_keywords:
+  NATIONAL: ["天下", "诸路", "諸路", "全国", "全國", "京師"]
+  NORTH: []
+  SOUTH: []
+
+notes:
+  - Region inference from Juan 186 is risky; default to unknown unless NATIONAL keywords trigger.
+  - Auto panel currently includes only NATIONAL in MVP auto mode.

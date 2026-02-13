@@ -1,4 +1,4 @@
-"""Generate a human review sheet from extracted Songshi candidates."""
+"""Generate a human review sheet from Songshi candidates or auto-facts."""
 
 from __future__ import annotations
 
@@ -8,9 +8,8 @@ import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 INPUT_CANDIDATES = BASE_DIR / "data" / "02_intermediate" / "candidates_songshi_juan186.csv"
-OUTPUT_REVIEW_SHEET = (
-    BASE_DIR / "data" / "02_intermediate" / "candidates_songshi_juan186_review_sheet.csv"
-)
+INPUT_AUTO_FACTS = BASE_DIR / "data" / "02_intermediate" / "auto_facts_songshi_juan186.csv"
+OUTPUT_REVIEW_SHEET = BASE_DIR / "data" / "02_intermediate" / "candidates_songshi_juan186_review_sheet.csv"
 
 REVIEW_COLUMNS = [
     "approve",
@@ -24,11 +23,17 @@ REVIEW_COLUMNS = [
 ]
 
 
+def _select_review_input(prefer_auto_facts: bool = True) -> Path:
+    """Choose review source file (auto-facts first by default)."""
+    if prefer_auto_facts and INPUT_AUTO_FACTS.exists() and INPUT_AUTO_FACTS.stat().st_size > 0:
+        return INPUT_AUTO_FACTS
+    return INPUT_CANDIDATES
+
+
 def make_review_sheet(input_csv: Path, output_csv: Path) -> pd.DataFrame:
     """Create a review sheet with blank human-annotation columns."""
-    candidates = pd.read_csv(input_csv)
-
-    review_sheet = candidates.copy()
+    source_df = pd.read_csv(input_csv)
+    review_sheet = source_df.copy()
     review_sheet["approve"] = 0
     for column in REVIEW_COLUMNS[1:]:
         review_sheet[column] = ""
@@ -40,7 +45,9 @@ def make_review_sheet(input_csv: Path, output_csv: Path) -> pd.DataFrame:
 
 def main() -> None:
     """CLI wrapper for review sheet generation."""
-    make_review_sheet(INPUT_CANDIDATES, OUTPUT_REVIEW_SHEET)
+    input_csv = _select_review_input(prefer_auto_facts=True)
+    make_review_sheet(input_csv, OUTPUT_REVIEW_SHEET)
+    print(f"review_source_csv: {input_csv}")
     print(f"review_sheet_csv: {OUTPUT_REVIEW_SHEET}")
 
 

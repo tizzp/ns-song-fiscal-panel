@@ -2,92 +2,87 @@
 
 Minimal, traceable Python pipelines for Song fiscal research scaffolding.
 
-## Scope
+## Core safety rule
 
-- Period panel scaffold: `XINNING`, `YUANFENG`, `SHAOSHENG`, `HUIZONG` × `NATIONAL/NORTH/SOUTH`
-- Text ingestion MVP: Songshi (宋史) Juǎn 186 from Wikisource
+Do **not** fabricate historical facts or interpretations.
 
-## Rule: no fabricated historical facts
+- **Auto outputs are provisional** and must remain unreviewed (`confidence=C`, `review_status=unreviewed`).
+- **Verified outputs** come only from explicitly approved review-sheet rows.
 
-Do **not** invent historical values or interpretations.
+## Auto vs verified separation
 
-- Candidates are provisional by default (`confidence=C`).
-- No candidate becomes a fact without explicit human approval in the review sheet.
+- **Auto path** (rule-based, no human review required):
+  - `candidates_songshi_juan186.csv`
+  - `auto_facts_songshi_juan186.csv`
+  - `panel_revenue_period_region_auto.csv`
+- **Verified path** (human approved):
+  - `candidates_songshi_juan186_review_sheet.csv`
+  - `extracts_songshi_juan186.csv`
+  - `panel_revenue_period_region_verified.csv`
 
-## Panel pipeline
+Do not use the auto panel for publication without human review.
 
-```bash
-run-song-pipeline
-```
+## Commands
 
-Behavior:
-
-- If `data/01_raw/extracts_songshi_juan186.csv` exists and is non-empty, it is used.
-- Otherwise, the pipeline falls back to `data/01_raw/extracts_seed.csv`.
-
-Outputs:
-
-- `data/02_intermediate/fact_numeric_extracts.parquet`
-- `data/03_primary/panel_revenue_period_region.csv`
-
-## Songshi Juǎn 186 workflow (human-in-the-loop)
-
-### 1) Ingest + extract candidates
-
-```bash
-run-songshi-juan186
-```
-
-Generates:
-
-- `data/01_raw/wikisource/songshi/juan186.txt`
-- `data/02_intermediate/candidates_songshi_juan186.csv`
-
-Candidate rows include char offsets, snippet hash, raw value/unit, parsed `value_num`,
-`unit_std`, rule-based topic/period hints (default `unknown`), and `confidence=C`.
-
-### 2) Generate review sheet
-
-```bash
-run-songshi-juan186-review
-```
-
-Generates:
-
-- `data/02_intermediate/candidates_songshi_juan186_review_sheet.csv`
-
-This sheet adds blank reviewer fields:
-
-- `approve` (0/1)
-- `final_period`, `final_topic`, `final_region`
-- `final_value_std`, `final_unit_std`
-- `interpretation_note`, `confidence_override`
-
-### 3) Promote approved rows to facts
-
-```bash
-run-songshi-juan186-promote
-```
-
-Generates:
-
-- `data/01_raw/extracts_songshi_juan186.csv`
-
-Promotion rules:
-
-- Only `approve == 1` rows are considered.
-- Required final fields must be present (`period/topic/region/value/unit`) or row is skipped.
-- Confidence defaults to `C` unless explicit `confidence_override` is set.
-
-### 4) Build panel from promoted facts
-
-```bash
-run-song-pipeline
-```
-
-## Install and test
+Install:
 
 ```bash
 python -m pip install -e .[dev]
+```
+
+### Ingest only (fetch + candidates)
+
+```bash
+run-songshi-juan186-ingest
+```
+
+### Auto provisional workflow (candidates -> auto_facts -> auto panel)
+
+```bash
+run-songshi-juan186-auto
+```
+
+### All-in-one auto workflow (ingest + auto)
+
+```bash
+run-songshi-juan186-all
+```
+
+### Review workflow
+
+```bash
+run-songshi-juan186-review
+run-songshi-juan186-promote
+run-songshi-juan186-verified
+```
+
+### Backward-compatible panel command
+
+```bash
+run-song-pipeline
+```
+
+This command runs the **verified** mode.
+
+## Output locations (generated, not committed)
+
+- `data/01_raw/wikisource/songshi/juan186.txt`
+- `data/02_intermediate/candidates_songshi_juan186.csv`
+- `data/02_intermediate/auto_facts_songshi_juan186.csv`
+- `data/02_intermediate/candidates_songshi_juan186_review_sheet.csv`
+- `data/01_raw/extracts_songshi_juan186.csv`
+- `data/03_primary/panel_revenue_period_region_auto.csv`
+- `data/03_primary/panel_revenue_period_region_verified.csv`
+
+## Rule-based auto organization (MVP)
+
+- Period inferred from era keywords (XINNING/YUANFENG/SHAOSHENG/HUIZONG).
+- Topic inferred from conservative fiscal keywords.
+- Region defaults to `unknown`; auto panel includes only `NATIONAL` rows.
+- Auto-facts are emitted only when period/topic/value are safely available.
+
+## Tests
+
+```bash
 pytest
 ```

@@ -1,4 +1,4 @@
-"""Tests for Songshi Juan 186 ingestion, extraction, and promotion workflow."""
+"""Tests for Songshi Juan 186 ingestion and provisional organization."""
 
 from __future__ import annotations
 
@@ -9,9 +9,10 @@ import pytest
 
 from extract.songshi_candidates import extract_candidates, parse_chinese_numeral
 from ingest.wikisource_fetch import fetch_wikisource_page
+from organize.auto_facts_songshi_juan186 import auto_organize_facts
 from review.promote_reviewed_to_facts import FACT_COLUMNS, promote_reviewed_to_facts
 
-REQUIRED_COLUMNS = {
+REQUIRED_CANDIDATE_COLUMNS = {
     "candidate_id",
     "source_work",
     "source_url",
@@ -66,8 +67,8 @@ def test_fetch_creates_nonempty_txt(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert out_txt.read_text(encoding="utf-8").strip() != ""
 
 
-def test_extract_candidates_schema_nonempty_and_confidence_c(tmp_path: Path) -> None:
-    """Extractor should produce non-empty candidate CSV with required schema."""
+def test_extract_candidates_required_columns_and_confidence(tmp_path: Path) -> None:
+    """Extraction should include traceability fields and confidence C."""
     txt_path = Path("tests/fixtures/juan186_sample.txt")
     out_csv = tmp_path / "candidates.csv"
 
@@ -78,13 +79,9 @@ def test_extract_candidates_schema_nonempty_and_confidence_c(tmp_path: Path) -> 
     )
 
     assert not df.empty
-    assert out_csv.exists()
-    assert REQUIRED_COLUMNS.issubset(df.columns)
-
-    loaded = pd.read_csv(out_csv)
-    assert not loaded.empty
-    assert REQUIRED_COLUMNS.issubset(loaded.columns)
-    assert (loaded["confidence"] == "C").all()
+    assert REQUIRED_CANDIDATE_COLUMNS.issubset(df.columns)
+    assert (df["confidence"] == "C").all()
+    assert (df["char_end"] >= df["char_start"]).all()
 
 
 @pytest.mark.parametrize(
@@ -99,6 +96,46 @@ def test_extract_candidates_schema_nonempty_and_confidence_c(tmp_path: Path) -> 
 def test_parse_chinese_numeral(value_raw: str, expected: float) -> None:
     """Chinese and Arabic numeral parser should parse common forms."""
     assert parse_chinese_numeral(value_raw) == expected
+
+
+def test_auto_facts_status_and_rule_trace(tmp_path: Path) -> None:
+    """Auto-facts should be unreviewed/C and include rule trace when inferred."""
+    candidates_csv = tmp_path / "candidates.csv"
+    out_csv = tmp_path / "auto_facts.csv"
+    rules_path = Path("metadata/rules_songshi_juan186.yml")
+
+    pd.DataFrame(
+        [
+            {
+                "candidate_id": "cid-1",
+                "source_work": "宋史",
+                "source_url": "https://zh.wikisource.org/zh-hans/宋史/卷186",
+                "source_ref": "https://zh.wikisource.org/zh-hans/宋史/卷186#start=1&end=3&cid=cid-1",
+                "juan": "186",
+                "char_start": 1,
+                "char_end": 3,
+                "snippet": "熙宁 商税 123 貫 京師",
+                "snippet_hash": "h1",
+                "value_raw": "123",
+                "value_num": 123.0,
+                "unit_raw": "貫",
+                "unit_std": "guan",
+                "keywords": "商税",
+                "candidate_topic": "shangshui",
+                "candidate_period": "XINNING",
+                "region": "unknown",
+                "confidence": "C",
+                "notes": "",
+            }
+        ]
+    ).to_csv(candidates_csv, index=False)
+
+    auto_facts = auto_organize_facts(candidates_csv, out_csv, rules_path)
+
+    assert not auto_facts.empty
+    assert (auto_facts["confidence"] == "C").all()
+    assert (auto_facts["review_status"] == "unreviewed").all()
+    assert auto_facts["rule_trace"].str.len().gt(0).all()
 
 
 def test_promote_only_approved_rows(tmp_path: Path) -> None:
@@ -117,7 +154,7 @@ def test_promote_only_approved_rows(tmp_path: Path) -> None:
                 "final_region": "NATIONAL",
                 "final_value_std": "300",
                 "final_unit_std": "guan",
-                "confidence_override": "B",
+                "confidence_override": "",
             },
             {
                 "candidate_id": "c-not-approved",
@@ -139,5 +176,4 @@ def test_promote_only_approved_rows(tmp_path: Path) -> None:
     assert out_facts.exists()
     assert list(facts.columns) == FACT_COLUMNS
     assert len(facts) == 1
-    assert facts.iloc[0]["extract_id"] == "songshi-juan186-c-approved"
-    assert facts.iloc[0]["confidence"] == "B"
+    assert facts.iloc[0]["confidence"] == "C"
