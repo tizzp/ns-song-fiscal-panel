@@ -1,0 +1,9 @@
+unit_map:
+  "贯|貫|缗|緡": guan
+  "文": wen
+  "石": shi
+  "斛": hu
+  "匹": pi
+  "斤": jin
+  "两|兩": liang
+default: unknown
