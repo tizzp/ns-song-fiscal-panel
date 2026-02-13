@@ -34,6 +34,9 @@ INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_n
 AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
 VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
 LEGACY_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region.csv"
+INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
+AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
+VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
 
 
 class ExtractRecord(BaseModel):
@@ -107,6 +110,10 @@ def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
             "supporting_extract_ids",
             lambda x: "|".join(sorted(set("|".join(x).split("|")))),
         )
+    ids_panel = (
+        grouped.groupby(["period", "region"], as_index=False)["supporting_extract_ids"]
+        .agg(lambda x: "|".join(sorted(set("|".join(x).split("|")))))
+        .rename(columns={"supporting_extract_ids": "supporting_extract_ids"})
     )
 
     for topic_name in EXPECTED_TOPIC_COLUMNS:
@@ -134,6 +141,7 @@ def run_panel_mode(mode: str) -> pd.DataFrame:
         raise ValueError("mode must be one of {'auto','verified'}")
 
     input_path = AUTO_FACTS_PATH if mode == "auto" else _resolve_verified_input()
+    input_path = AUTO_FACTS_PATH if mode == "auto" else VERIFIED_FACTS_PATH
     output_path = AUTO_PANEL_PATH if mode == "auto" else VERIFIED_PANEL_PATH
 
     if not input_path.exists() or input_path.stat().st_size == 0:
