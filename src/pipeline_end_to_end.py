@@ -1,4 +1,4 @@
-"""Run a minimal traceable end-to-end fiscal panel pipeline."""
+"""Build period-region panel outputs from auto or verified Songshi facts."""
 
 from __future__ import annotations
 
@@ -22,24 +22,20 @@ REQUIRED_COLUMNS: Final[list[str]] = [
     "source_ref",
 ]
 
-EXPECTED_TOPIC_COLUMNS: Final[list[str]] = [
-    "revenue_total",
-    "liangshui",
-    "shangshui",
-]
+PERIODS: Final[set[str]] = {"XINNING", "YUANFENG", "SHAOSHENG", "HUIZONG"}
+TOPICS: Final[set[str]] = {"revenue_total", "liangshui", "shangshui"}
+EXPECTED_TOPIC_COLUMNS: Final[list[str]] = ["revenue_total", "liangshui", "shangshui"]
 
 BASE_DIR: Final[Path] = Path(__file__).resolve().parents[1]
-RAW_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_seed.csv"
-INTERMEDIATE_PATH: Final[Path] = (
-    BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
-)
-PANEL_PATH: Final[Path] = (
-    BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region.csv"
-)
+VERIFIED_FACTS_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_songshi_juan186.csv"
+AUTO_FACTS_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "auto_facts_songshi_juan186.csv"
+INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
+AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
+VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
 
 
 class ExtractRecord(BaseModel):
-    """Schema for each numeric extract record."""
+    """Schema for facts rows consumed by panel pipeline."""
 
     extract_id: str
     period: str
@@ -72,62 +68,90 @@ def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
     return numerator.div(denominator.where(denominator > 0))
 
 
+def _filtered_for_panel(df: pd.DataFrame, mode: str) -> pd.DataFrame:
+    """Filter facts to panel-supported periods/topics and mode-specific region rules."""
+    filtered = df[df["period"].isin(PERIODS) & df["topic"].isin(TOPICS)].copy()
+    if mode == "auto":
+        filtered = filtered[filtered["region"] == "NATIONAL"]
+    return filtered
+
+
 def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate extracts, pivot to wide, and compute share metrics."""
+    """Aggregate extracts, pivot to wide, compute shares, and attach supporting ids."""
     grouped = (
-        extracts.groupby(["period", "region", "topic"], as_index=False)["value"]
-        .sum()
-        .rename(columns={"value": "topic_value"})
+        extracts.groupby(["period", "region", "topic"], as_index=False)
+        .agg(topic_value=("value", "sum"), supporting_extract_ids=("extract_id", lambda x: "|".join(sorted(set(x)))))
     )
 
-    panel = (
-        grouped.pivot(
-            index=["period", "region"],
-            columns="topic",
-            values="topic_value",
-        )
-        .reset_index()
-    )
-    panel.columns.name = None
+    value_panel = grouped.pivot(index=["period", "region"], columns="topic", values="topic_value").reset_index()
+    value_panel.columns.name = None
 
-    missing_topics = [
-        topic_name for topic_name in EXPECTED_TOPIC_COLUMNS if topic_name not in panel.columns
-    ]
-    if missing_topics:
-        LOGGER.warning(
-            "Missing topic columns after pivot; filling with 0 values: %s",
-            missing_topics,
-        )
-        for topic_name in missing_topics:
-            panel[topic_name] = 0.0
-
-    panel["share_liangshui_in_total"] = _safe_divide(
-        panel["liangshui"],
-        panel["revenue_total"],
-    )
-    panel["share_shangshui_in_total"] = _safe_divide(
-        panel["shangshui"],
-        panel["revenue_total"],
+    ids_panel = (
+        grouped.groupby(["period", "region"], as_index=False)["supporting_extract_ids"]
+        .agg(lambda x: "|".join(sorted(set("|".join(x).split("|")))))
+        .rename(columns={"supporting_extract_ids": "supporting_extract_ids"})
     )
 
+    for topic_name in EXPECTED_TOPIC_COLUMNS:
+        if topic_name not in value_panel.columns:
+            LOGGER.warning("Missing topic column after pivot; filling with 0: %s", topic_name)
+            value_panel[topic_name] = 0.0
+
+    panel = value_panel.merge(ids_panel, on=["period", "region"], how="left")
+    panel["share_liangshui_in_total"] = _safe_divide(panel["liangshui"], panel["revenue_total"])
+    panel["share_shangshui_in_total"] = _safe_divide(panel["shangshui"], panel["revenue_total"])
     panel = panel.sort_values(["period", "region"]).reset_index(drop=True)
     return panel
 
 
-def run_pipeline() -> pd.DataFrame:
-    """Execute pipeline from seed extracts to panel output."""
-    extracts = pd.read_csv(RAW_PATH)
+def run_panel_mode(mode: str) -> pd.DataFrame:
+    """Run a single panel mode: auto or verified."""
+    if mode not in {"auto", "verified"}:
+        raise ValueError("mode must be one of {'auto','verified'}")
+
+    input_path = AUTO_FACTS_PATH if mode == "auto" else VERIFIED_FACTS_PATH
+    output_path = AUTO_PANEL_PATH if mode == "auto" else VERIFIED_PANEL_PATH
+
+    if not input_path.exists() or input_path.stat().st_size == 0:
+        empty = pd.DataFrame(
+            columns=[
+                "period",
+                "region",
+                "revenue_total",
+                "liangshui",
+                "shangshui",
+                "supporting_extract_ids",
+                "share_liangshui_in_total",
+                "share_shangshui_in_total",
+            ]
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        empty.to_csv(output_path, index=False)
+        return empty
+
+    extracts = pd.read_csv(input_path)
     validate_columns(extracts)
     validate_rows(extracts)
+    filtered = _filtered_for_panel(extracts, mode=mode)
 
-    INTERMEDIATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PANEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if mode == "verified":
+        INTERMEDIATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        extracts.to_parquet(INTERMEDIATE_PATH, index=False)
 
-    extracts.to_parquet(INTERMEDIATE_PATH, index=False)
-
-    panel = compute_panel(extracts)
-    panel.to_csv(PANEL_PATH, index=False)
+    panel = compute_panel(filtered)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    panel.to_csv(output_path, index=False)
     return panel
+
+
+def run_pipeline() -> pd.DataFrame:
+    """Run verified mode for backwards-compatible command behavior."""
+    return run_panel_mode("verified")
+
+
+def run_auto_panel() -> pd.DataFrame:
+    """Run auto mode panel aggregation from provisional auto-facts."""
+    return run_panel_mode("auto")
 
 
 if __name__ == "__main__":

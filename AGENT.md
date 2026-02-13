@@ -1,30 +1,36 @@
 # Agent rules for this repository
 
-## 1) Evidence pointers are mandatory
+## 1) No fabricated historical facts
 
-- Every extract row must include a non-empty `source_ref` pointer.
-- Do not create derived values unless they can be traced to extract rows.
-- For real data, prefer `book:<book_id>|locator:<locator_text>` style pointers.
+- Never invent historical values or interpretations.
+- Keep auto outputs provisional (`confidence=C`, `review_status=unreviewed`).
 
-## 2) Schema discipline
+## 2) Candidates vs facts boundary
 
-- Do not rename required columns without updating all of:
-  - `metadata/schema.md`
-  - tests
-  - pipeline code
-- Keep controlled vocabulary aligned with `metadata/taxonomy.yml`.
+- Candidates and auto-facts are **not verified facts**.
+- Only rows with explicit `approve=1` in review sheet may be promoted to facts.
+- Promotion must use reviewer-provided `final_*` fields.
 
-## 3) No silent changes
+## 3) Auto vs verified separation
 
-- Any logic change must be documented in `README.md`.
-- Any schema change must be documented in `metadata/schema.md`.
+- Auto panel is provisional and must not be used for publication without review.
+- Verified panel must be built only from approved facts (`extracts_songshi_juan186.csv`).
+- Do not let verified mode consume auto-facts directly.
 
-## 4) Traceability first
+## 4) Evidence and traceability
 
-- Output rows in the panel must be reproducible from the facts table via deterministic aggregation.
-- Keep transformations explicit and easy to audit.
+- Every output row must have a source pointer (`source_ref`).
+- Preserve candidate offsets (`char_start`, `char_end`) and snippet traceability.
+- Keep transformations deterministic and auditable.
 
-## 5) No fabricated historical facts
+## 5) Ingestion hygiene
 
-- Never invent historical values or claims.
-- Seed values are placeholders only and must remain `confidence=C` until replaced by real extracts.
+- Preserve raw source text artifacts.
+- Keep source URL and license metadata.
+- Rate limit requests.
+- Do not broaden beyond Songshi Juǎn 186 in this MVP.
+
+## 6) Change discipline
+
+- Update docs/tests whenever schema or logic changes.
+- Do not silently change controlled vocabularies or rules.

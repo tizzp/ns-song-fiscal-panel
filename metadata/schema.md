@@ -1,35 +1,43 @@
 # Schema reference
 
-## Input facts table (`extracts_seed.csv`)
+## Candidate extraction output
 
-Required columns:
+`data/02_intermediate/candidates_songshi_juan186.csv`:
 
-- `extract_id` (string): unique id for a source extract row.
-- `period` (string): one of XINNING, YUANFENG, SHAOSHENG, HUIZONG.
-- `region` (string): one of NATIONAL, NORTH, SOUTH.
-- `topic` (string): one of revenue_total, liangshui, shangshui.
-- `value` (number): numeric value extracted from source.
-- `unit` (string): measurement unit (placeholder uses `guan`).
-- `confidence` (string): evidence confidence grade (placeholder must be `C`).
-- `source_ref` (string): source evidence pointer.
+- `candidate_id`
+- `source_work`, `source_url`, `source_ref`
+- `juan`, `char_start`, `char_end`, `snippet`, `snippet_hash`
+- `value_raw`, `value_num`, `unit_raw`, `unit_std`
+- `keywords`, `candidate_topic`, `candidate_period`, `region`
+- `confidence`, `notes`
 
-### Recommended `source_ref` structure
+Rules:
 
-Use a structured pointer so humans can trace each row quickly:
+- Candidate rows are provisional and default to `confidence=C`.
+- `source_ref` must include URL + character offsets + candidate id.
 
-- Format: `book:<book_id>|locator:<locator_text>`
-- Example: `book:SongShi-ZhiShiHuo|locator:juan-173-folio-12b`
+## Auto-facts output (provisional)
 
-For placeholder seed rows only, `placeholder://...` values are allowed.
-Real extract rows should use book + locator format.
+`data/02_intermediate/auto_facts_songshi_juan186.csv`:
 
-## Output panel (`panel_revenue_period_region.csv`)
+- `extract_id`
+- `period` (`XINNING|YUANFENG|SHAOSHENG|HUIZONG|unknown`)
+- `region` (`NATIONAL|NORTH|SOUTH|unknown`)
+- `topic` (`revenue_total|liangshui|shangshui|unknown`)
+- `value` (float)
+- `unit` (standardized unit or `unknown`)
+- `confidence` (always `C`)
+- `review_status` (always `unreviewed`)
+- `source_ref`
+- `rule_trace`
 
-- Primary key: (`period`, `region`).
-- Base topic columns: `revenue_total`, `liangshui`, `shangshui`.
-- Derived columns:
-  - `share_liangshui_in_total` = liangshui / revenue_total
-  - `share_shangshui_in_total` = shangshui / revenue_total
-- Share behavior:
-  - If `revenue_total > 0`, shares are finite values in `[0, 1]`.
-  - If `revenue_total <= 0`, shares are `NaN` (never `inf`).
+## Verified facts output
+
+`data/01_raw/extracts_songshi_juan186.csv` (only from approved review rows):
+
+- `extract_id`, `period`, `region`, `topic`, `value`, `unit`, `confidence`, `source_ref`
+
+## Panels
+
+- Auto panel: `data/03_primary/panel_revenue_period_region_auto.csv` (provisional)
+- Verified panel: `data/03_primary/panel_revenue_period_region_verified.csv` (approved facts path)

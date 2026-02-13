@@ -1,0 +1,11 @@
+# Source registry for textual ingestion.
+
+sources:
+  - source_name: wikisource_songshi
+    base_url: https://zh.wikisource.org
+    page: https://zh.wikisource.org/zh-hans/宋史/卷186
+    license: CC BY-SA 4.0
+    retrieval_date:
+    notes: >-
+      Songshi (宋史) Juan 186 page text used for candidate numeric mention extraction.
+      Candidates are for human review only and are not final historical facts.

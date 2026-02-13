@@ -1,89 +1,88 @@
 # ns-song-fiscal-panel
 
-Minimal, traceable Python pipeline to build a fiscal panel by **period x region**.
+Minimal, traceable Python pipelines for Song fiscal research scaffolding.
 
-## Scope
+## Core safety rule
 
-- Periods: `XINNING`, `YUANFENG`, `SHAOSHENG`, `HUIZONG`
-- Regions: `NATIONAL`, `NORTH`, `SOUTH`
-- Topics: `revenue_total`, `liangshui`, `shangshui`
+Do **not** fabricate historical facts or interpretations.
 
-The pipeline starts from a numeric extract facts table and produces:
+- **Auto outputs are provisional** and must remain unreviewed (`confidence=C`, `review_status=unreviewed`).
+- **Verified outputs** come only from explicitly approved review-sheet rows.
 
-1. Intermediate facts parquet
-2. Primary panel CSV with derived share metrics
+## Auto vs verified separation
 
-## Repository layout
+- **Auto path** (rule-based, no human review required):
+  - `candidates_songshi_juan186.csv`
+  - `auto_facts_songshi_juan186.csv`
+  - `panel_revenue_period_region_auto.csv`
+- **Verified path** (human approved):
+  - `candidates_songshi_juan186_review_sheet.csv`
+  - `extracts_songshi_juan186.csv`
+  - `panel_revenue_period_region_verified.csv`
 
-- `data/01_raw/`: input extracts (seed placeholder included)
-- `data/02_intermediate/`: generated facts parquet
-- `data/03_primary/`: generated panel output
-- `data/04_features/`: reserved for later feature outputs
-- `metadata/taxonomy.yml`: controlled vocabulary
-- `metadata/schema.md`: schema contract
-- `src/pipeline_end_to_end.py`: runnable pipeline
-- `tests/`: baseline unit tests
+Do not use the auto panel for publication without human review.
 
-## Data model + traceability
+## Commands
 
-Input facts schema is documented in `metadata/schema.md`.
-Each extract row must include:
-
-- `extract_id`
-- `source_ref`
-- `confidence`
-
-The included seed data is placeholder-only and uses `confidence=C`.
-
-### No fabricated historical facts
-
-Do **not** invent historical values or claims.
-Use seed data only as runnable scaffolding until real extracts are available.
-
-### Transformation logic
-
-Panel rows are deterministic aggregates from extract rows grouped by:
-
-- `period`
-- `region`
-- `topic`
-
-Topics are pivoted to wide columns and shares are computed:
-
-- `share_liangshui_in_total = liangshui / revenue_total`
-- `share_shangshui_in_total = shangshui / revenue_total`
-
-Share handling is safe:
-
-- If `revenue_total > 0`, shares are finite values in `[0, 1]`.
-- If `revenue_total <= 0`, shares are `NaN` (never `inf`).
-
-## Reproducible setup
+Install:
 
 ```bash
 python -m pip install -e .[dev]
 ```
 
-## Single command to run pipeline
+### Ingest only (fetch + candidates)
+
+```bash
+run-songshi-juan186-ingest
+```
+
+### Auto provisional workflow (candidates -> auto_facts -> auto panel)
+
+```bash
+run-songshi-juan186-auto
+```
+
+### All-in-one auto workflow (ingest + auto)
+
+```bash
+run-songshi-juan186-all
+```
+
+### Review workflow
+
+```bash
+run-songshi-juan186-review
+run-songshi-juan186-promote
+run-songshi-juan186-verified
+```
+
+### Backward-compatible panel command
 
 ```bash
 run-song-pipeline
 ```
 
-Outputs created:
+This command runs the **verified** mode.
 
-- `data/02_intermediate/fact_numeric_extracts.parquet`
-- `data/03_primary/panel_revenue_period_region.csv`
+## Output locations (generated, not committed)
 
-## Run tests
+- `data/01_raw/wikisource/songshi/juan186.txt`
+- `data/02_intermediate/candidates_songshi_juan186.csv`
+- `data/02_intermediate/auto_facts_songshi_juan186.csv`
+- `data/02_intermediate/candidates_songshi_juan186_review_sheet.csv`
+- `data/01_raw/extracts_songshi_juan186.csv`
+- `data/03_primary/panel_revenue_period_region_auto.csv`
+- `data/03_primary/panel_revenue_period_region_verified.csv`
+
+## Rule-based auto organization (MVP)
+
+- Period inferred from era keywords (XINNING/YUANFENG/SHAOSHENG/HUIZONG).
+- Topic inferred from conservative fiscal keywords.
+- Region defaults to `unknown`; auto panel includes only `NATIONAL` rows.
+- Auto-facts are emitted only when period/topic/value are safely available.
+
+## Tests
 
 ```bash
 pytest
 ```
-
-## Replace seed with real extracts
-
-1. Replace `data/01_raw/extracts_seed.csv` with real extract rows under the same schema.
-2. Keep required columns and taxonomy values aligned with `metadata/taxonomy.yml`.
-3. Ensure every row has a valid evidence pointer in `source_ref` and a confidence rating.
-4. Re-run `run-song-pipeline` and then `pytest`.
