@@ -34,9 +34,6 @@ INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_n
 AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
 VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
 LEGACY_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region.csv"
-INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
-AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
-VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
 
 
 class ExtractRecord(BaseModel):
@@ -78,7 +75,6 @@ def _filtered_for_panel(df: pd.DataFrame, mode: str) -> pd.DataFrame:
     filtered = df[df["period"].isin(PERIODS) & df["topic"].isin(TOPICS)].copy()
     if mode == "auto":
         filtered = filtered[filtered["region"].isin({"NATIONAL", "NORTH", "SOUTH"})]
-        filtered = filtered[filtered["region"] == "NATIONAL"]
     return filtered
 
 
@@ -106,11 +102,6 @@ def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
     value_panel = grouped.pivot(index=["period", "region"], columns="topic", values="topic_value").reset_index()
     value_panel.columns.name = None
 
-    ids_panel = grouped.groupby(["period", "region"], as_index=False).agg(
-        supporting_extract_ids=(
-            "supporting_extract_ids",
-            lambda x: "|".join(sorted(set("|".join(x).split("|")))),
-        )
     ids_panel = (
         grouped.groupby(["period", "region"], as_index=False)["supporting_extract_ids"]
         .agg(lambda x: "|".join(sorted(set("|".join(x).split("|")))))
@@ -142,7 +133,6 @@ def run_panel_mode(mode: str) -> pd.DataFrame:
         raise ValueError("mode must be one of {'auto','verified'}")
 
     input_path = AUTO_FACTS_PATH if mode == "auto" else _resolve_verified_input()
-    input_path = AUTO_FACTS_PATH if mode == "auto" else VERIFIED_FACTS_PATH
     output_path = AUTO_PANEL_PATH if mode == "auto" else VERIFIED_PANEL_PATH
 
     if not input_path.exists() or input_path.stat().st_size == 0:
@@ -160,6 +150,8 @@ def run_panel_mode(mode: str) -> pd.DataFrame:
         )
         output_path.parent.mkdir(parents=True, exist_ok=True)
         empty.to_csv(output_path, index=False)
+        if mode == "verified":
+            empty.to_csv(LEGACY_PANEL_PATH, index=False)
         return empty
 
     extracts = pd.read_csv(input_path)

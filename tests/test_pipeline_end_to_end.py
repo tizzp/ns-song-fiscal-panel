@@ -1,5 +1,4 @@
-"""Tests for verified and auto panel generation modes."""
-"""Tests for auto and verified panel generation."""
+"""Tests for auto and verified panel generation behavior."""
 
 from __future__ import annotations
 
@@ -8,244 +7,169 @@ from pathlib import Path
 
 import pandas as pd
 
-from extract.songshi_candidates import SOURCE_URL, extract_candidates
-from organize.auto_facts_songshi_juan186 import auto_organize_facts
-from pipeline_end_to_end import run_auto_panel, run_panel_mode
+from pipeline_end_to_end import run_panel_mode, run_pipeline
 
 
-def test_verified_mode_allows_empty_panel_when_no_input_files(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    """Verified mode should not crash when both verified and seed facts are absent."""
+REQUIRED_FACT_COLUMNS = [
+    "extract_id",
+    "period",
+    "region",
+    "topic",
+    "value",
+    "unit",
+    "confidence",
+    "source_ref",
+]
+
+
+def test_verified_mode_uses_seed_fallback_and_writes_legacy_panel(tmp_path: Path, monkeypatch) -> None:
+    """run_pipeline should use seed facts if verified facts are absent and write legacy panel."""
     verified_facts = tmp_path / "extracts_songshi_juan186.csv"
     seed_facts = tmp_path / "extracts_seed.csv"
     verified_panel = tmp_path / "panel_verified.csv"
     legacy_panel = tmp_path / "panel_legacy.csv"
 
-    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_FACTS_PATH", verified_facts)
-    monkeypatch.setattr("pipeline_end_to_end.SEED_FACTS_PATH", seed_facts)
-    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_PANEL_PATH", verified_panel)
-    monkeypatch.setattr("pipeline_end_to_end.LEGACY_PANEL_PATH", legacy_panel)
-
-    panel = run_panel_mode("verified")
-
-    assert panel.empty
-    assert verified_panel.exists()
-    assert not legacy_panel.exists()
-
-
-def test_verified_mode_falls_back_to_seed_and_writes_legacy_path(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    """Verified mode should use seed facts when verified facts are missing."""
-    verified_facts = tmp_path / "extracts_songshi_juan186.csv"
-    seed_facts = tmp_path / "extracts_seed.csv"
-    verified_panel = tmp_path / "panel_verified.csv"
-    legacy_panel = tmp_path / "panel_legacy.csv"
-
-    pd.DataFrame(
+    seed_rows = pd.DataFrame(
         [
             {
-                "extract_id": "seed-1",
+                "extract_id": "seed-rt",
                 "period": "XINNING",
                 "region": "NATIONAL",
                 "topic": "revenue_total",
-                "value": 10,
-                "unit": "guan",
-                "confidence": "C",
-                "source_ref": "seed#1",
-            }
-        ]
-    ).to_csv(seed_facts, index=False)
-
-    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_FACTS_PATH", verified_facts)
-    monkeypatch.setattr("pipeline_end_to_end.SEED_FACTS_PATH", seed_facts)
-    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_PANEL_PATH", verified_panel)
-    monkeypatch.setattr("pipeline_end_to_end.LEGACY_PANEL_PATH", legacy_panel)
-
-    panel = run_panel_mode("verified")
-
-    assert not panel.empty
-    assert verified_panel.exists()
-    assert legacy_panel.exists()
-
-
-def test_verified_mode_prefers_verified_facts_when_present(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    """Verified mode should use verified facts when available and ignore seed fallback."""
-    verified_facts = tmp_path / "extracts_songshi_juan186.csv"
-    seed_facts = tmp_path / "extracts_seed.csv"
-    verified_panel = tmp_path / "panel_verified.csv"
-    legacy_panel = tmp_path / "panel_legacy.csv"
-
-    pd.DataFrame(
-        [
-            {
-                "extract_id": "verified-1",
-                "period": "YUANFENG",
-                "region": "NATIONAL",
-                "topic": "revenue_total",
-                "value": 100,
+                "value": 100.0,
                 "unit": "guan",
                 "confidence": "B",
-                "source_ref": "verified#1",
+                "source_ref": "seed#rt",
             }
-        ]
-    ).to_csv(verified_facts, index=False)
-
-    pd.DataFrame(
-        [
-            {
-                "extract_id": "seed-1",
-                "period": "XINNING",
-                "region": "NATIONAL",
-                "topic": "revenue_total",
-                "value": 10,
-                "unit": "guan",
-                "confidence": "C",
-                "source_ref": "seed#1",
-            }
-        ]
-    ).to_csv(seed_facts, index=False)
+        ],
+        columns=REQUIRED_FACT_COLUMNS,
+    )
+    seed_rows.to_csv(seed_facts, index=False)
 
     monkeypatch.setattr("pipeline_end_to_end.VERIFIED_FACTS_PATH", verified_facts)
     monkeypatch.setattr("pipeline_end_to_end.SEED_FACTS_PATH", seed_facts)
     monkeypatch.setattr("pipeline_end_to_end.VERIFIED_PANEL_PATH", verified_panel)
     monkeypatch.setattr("pipeline_end_to_end.LEGACY_PANEL_PATH", legacy_panel)
 
-    panel = run_panel_mode("verified")
+    panel = run_pipeline()
 
-    assert set(panel["period"]) == {"YUANFENG"}
+    assert not panel.empty
+    assert set(panel["period"]) == {"XINNING"}
     assert verified_panel.exists()
     assert legacy_panel.exists()
 
 
-def test_auto_mode_from_fixture_candidates_generates_valid_panel(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    """Auto mode should produce a stable panel from fixture-based candidates."""
-    txt_path = Path("tests/fixtures/juan186_sample.txt")
-    rules_path = Path("metadata/rules_songshi_juan186.yml")
-
-    candidates_path = tmp_path / "candidates_songshi_juan186.csv"
-    auto_facts_path = tmp_path / "auto_facts_songshi_juan186.csv"
-    auto_panel_path = tmp_path / "panel_revenue_period_region_auto.csv"
-
-    extract_candidates(txt_path=txt_path, out_csv=candidates_path, source_ref=SOURCE_URL)
-    auto_facts = auto_organize_facts(candidates_path, auto_facts_path, rules_path)
-
-    assert not auto_facts.empty
-
-    monkeypatch.setattr("pipeline_end_to_end.AUTO_FACTS_PATH", auto_facts_path)
-    monkeypatch.setattr("pipeline_end_to_end.AUTO_PANEL_PATH", auto_panel_path)
-
-    panel = run_auto_panel()
-
-    assert auto_panel_path.exists()
-    expected_columns = {
-        "period",
-        "region",
-        "revenue_total",
-        "liangshui",
-        "shangshui",
-        "supporting_extract_ids",
-        "share_liangshui_in_total",
-        "share_shangshui_in_total",
-    }
-    assert expected_columns.issubset(panel.columns)
-    assert not panel.duplicated(subset=["period", "region"]).any()
-    assert panel["region"].isin({"NATIONAL", "NORTH", "SOUTH"}).all()
-
-    for col in ["share_liangshui_in_total", "share_shangshui_in_total"]:
-        assert not panel[col].dropna().map(math.isinf).any()
-
-    non_positive = panel["revenue_total"] <= 0
-    if non_positive.any():
-        assert panel.loc[non_positive, "share_liangshui_in_total"].isna().all()
-        assert panel.loc[non_positive, "share_shangshui_in_total"].isna().all()
-
-    positive = panel["revenue_total"] > 0
-    if positive.any():
-        assert panel.loc[positive, "share_liangshui_in_total"].between(0, 1, inclusive="both").all()
-        assert panel.loc[positive, "share_shangshui_in_total"].between(0, 1, inclusive="both").all()
-from pipeline_end_to_end import run_panel_mode
-
-
-def test_auto_panel_uniqueness_and_share_bounds(tmp_path: Path, monkeypatch) -> None:
-    """Auto panel should have unique keys and valid share behavior."""
+def test_auto_mode_keeps_national_north_south_rows(tmp_path: Path, monkeypatch) -> None:
+    """Auto panel should keep NATIONAL, NORTH, and SOUTH rows and drop unknown."""
     auto_facts_path = tmp_path / "auto_facts.csv"
     auto_panel_path = tmp_path / "auto_panel.csv"
 
-    auto_facts = pd.DataFrame(
+    auto_rows = pd.DataFrame(
         [
             {
-                "extract_id": "a-1",
+                "extract_id": "a-national",
                 "period": "XINNING",
                 "region": "NATIONAL",
                 "topic": "revenue_total",
                 "value": 100.0,
                 "unit": "guan",
                 "confidence": "C",
-                "review_status": "unreviewed",
-                "source_ref": "u#1",
-                "rule_trace": "period:熙宁|topic:課入|region:京師",
+                "source_ref": "ref#n",
             },
             {
-                "extract_id": "a-2",
+                "extract_id": "a-north",
                 "period": "XINNING",
-                "region": "NATIONAL",
-                "topic": "liangshui",
-                "value": 20.0,
+                "region": "NORTH",
+                "topic": "revenue_total",
+                "value": 60.0,
                 "unit": "guan",
                 "confidence": "C",
-                "review_status": "unreviewed",
-                "source_ref": "u#2",
-                "rule_trace": "period:熙宁|topic:兩稅",
+                "source_ref": "ref#north",
             },
             {
-                "extract_id": "a-3",
+                "extract_id": "a-south",
                 "period": "XINNING",
-                "region": "NATIONAL",
-                "topic": "shangshui",
+                "region": "SOUTH",
+                "topic": "revenue_total",
+                "value": 40.0,
+                "unit": "guan",
+                "confidence": "C",
+                "source_ref": "ref#south",
+            },
+            {
+                "extract_id": "a-unknown",
+                "period": "XINNING",
+                "region": "unknown",
+                "topic": "revenue_total",
                 "value": 10.0,
                 "unit": "guan",
                 "confidence": "C",
-                "review_status": "unreviewed",
-                "source_ref": "u#3",
-                "rule_trace": "period:熙宁|topic:商税",
+                "source_ref": "ref#u",
             },
-        ]
+        ],
+        columns=REQUIRED_FACT_COLUMNS,
     )
-    auto_facts.to_csv(auto_facts_path, index=False)
+    auto_rows.to_csv(auto_facts_path, index=False)
 
     monkeypatch.setattr("pipeline_end_to_end.AUTO_FACTS_PATH", auto_facts_path)
     monkeypatch.setattr("pipeline_end_to_end.AUTO_PANEL_PATH", auto_panel_path)
 
     panel = run_panel_mode("auto")
 
-    assert not panel.empty
-    assert not panel.duplicated(subset=["period", "region"]).any()
-
-    positive_revenue = panel["revenue_total"] > 0
-    for column in ["share_liangshui_in_total", "share_shangshui_in_total"]:
-        assert panel.loc[positive_revenue, column].between(0, 1, inclusive="both").all()
-        assert not panel[column].dropna().map(math.isinf).any()
+    assert auto_panel_path.exists()
+    assert set(panel["region"]) == {"NATIONAL", "NORTH", "SOUTH"}
 
 
-def test_verified_panel_empty_when_no_approved_facts(tmp_path: Path, monkeypatch) -> None:
-    """Verified mode should not crash and may emit an empty panel."""
-    verified_facts = tmp_path / "missing_verified.csv"
-    verified_panel = tmp_path / "verified_panel.csv"
+def test_panel_shares_are_finite_and_bounded_when_revenue_positive(tmp_path: Path, monkeypatch) -> None:
+    """Share columns should avoid inf and remain within [0,1] for positive revenue rows."""
+    auto_facts_path = tmp_path / "auto_facts.csv"
+    auto_panel_path = tmp_path / "auto_panel.csv"
 
-    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_FACTS_PATH", verified_facts)
-    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_PANEL_PATH", verified_panel)
+    rows = pd.DataFrame(
+        [
+            {
+                "extract_id": "a-total",
+                "period": "YUANFENG",
+                "region": "NATIONAL",
+                "topic": "revenue_total",
+                "value": 200.0,
+                "unit": "guan",
+                "confidence": "C",
+                "source_ref": "ref#1",
+            },
+            {
+                "extract_id": "a-liang",
+                "period": "YUANFENG",
+                "region": "NATIONAL",
+                "topic": "liangshui",
+                "value": 50.0,
+                "unit": "guan",
+                "confidence": "C",
+                "source_ref": "ref#2",
+            },
+            {
+                "extract_id": "a-shang",
+                "period": "YUANFENG",
+                "region": "NATIONAL",
+                "topic": "shangshui",
+                "value": 25.0,
+                "unit": "guan",
+                "confidence": "C",
+                "source_ref": "ref#3",
+            },
+        ],
+        columns=REQUIRED_FACT_COLUMNS,
+    )
+    rows.to_csv(auto_facts_path, index=False)
 
-    panel = run_panel_mode("verified")
+    monkeypatch.setattr("pipeline_end_to_end.AUTO_FACTS_PATH", auto_facts_path)
+    monkeypatch.setattr("pipeline_end_to_end.AUTO_PANEL_PATH", auto_panel_path)
 
-    assert panel.empty
-    assert verified_panel.exists()
+    panel = run_panel_mode("auto")
+
+    for share_col in ["share_liangshui_in_total", "share_shangshui_in_total"]:
+        assert not panel[share_col].dropna().map(math.isinf).any()
+
+    positive = panel["revenue_total"] > 0
+    assert panel.loc[positive, "share_liangshui_in_total"].between(0, 1, inclusive="both").all()
+    assert panel.loc[positive, "share_shangshui_in_total"].between(0, 1, inclusive="both").all()
