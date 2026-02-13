@@ -15,6 +15,7 @@
 
 - Auto panel is provisional and must not be used for publication without review.
 - Auto-facts generation is allowed only as provisional output (`review_status=unreviewed`, `confidence=C`).
+- Auto region labels (NATIONAL/NORTH/SOUTH) are heuristic keyword matches in this MVP and require human verification.
 - Verified panel must be built only from approved facts (`extracts_songshi_juan186.csv`).
 - Do not let verified mode consume auto-facts directly.
 

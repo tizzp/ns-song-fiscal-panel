@@ -77,6 +77,7 @@ def _filtered_for_panel(df: pd.DataFrame, mode: str) -> pd.DataFrame:
     """Filter facts to panel-supported periods/topics and mode-specific region rules."""
     filtered = df[df["period"].isin(PERIODS) & df["topic"].isin(TOPICS)].copy()
     if mode == "auto":
+        filtered = filtered[filtered["region"].isin({"NATIONAL", "NORTH", "SOUTH"})]
         filtered = filtered[filtered["region"] == "NATIONAL"]
     return filtered
 

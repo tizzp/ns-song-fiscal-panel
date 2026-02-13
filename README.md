@@ -21,6 +21,7 @@ Do **not** fabricate historical facts or interpretations.
   - `panel_revenue_period_region_verified.csv`
 
 Do not use the auto panel for publication without human review.
+Auto outputs remain provisional by design (`confidence=C`, `review_status=unreviewed`).
 
 ## Commands
 
@@ -84,6 +85,10 @@ This command runs the **verified** mode and keeps compatibility with older flows
 
 - Period inferred from era keywords (XINNING/YUANFENG/SHAOSHENG/HUIZONG).
 - Topic inferred from conservative fiscal keywords.
+- Region inferred heuristically from macro-region keywords as `NATIONAL`, `NORTH`, or `SOUTH`.
+- If no conservative region keyword is found, region remains `unknown` and is excluded from auto panel.
+- Auto-facts are emitted only when period/topic/value are safely available.
+- Region inference is provisional and should be treated as a review candidate, not publication-ready fact.
 - Region defaults to `unknown`; auto panel includes only `NATIONAL` rows.
 - Auto-facts are emitted only when period/topic/value are safely available.
 

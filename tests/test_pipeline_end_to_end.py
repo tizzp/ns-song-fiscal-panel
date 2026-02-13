@@ -72,6 +72,58 @@ def test_verified_mode_falls_back_to_seed_and_writes_legacy_path(
     assert legacy_panel.exists()
 
 
+def test_verified_mode_prefers_verified_facts_when_present(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Verified mode should use verified facts when available and ignore seed fallback."""
+    verified_facts = tmp_path / "extracts_songshi_juan186.csv"
+    seed_facts = tmp_path / "extracts_seed.csv"
+    verified_panel = tmp_path / "panel_verified.csv"
+    legacy_panel = tmp_path / "panel_legacy.csv"
+
+    pd.DataFrame(
+        [
+            {
+                "extract_id": "verified-1",
+                "period": "YUANFENG",
+                "region": "NATIONAL",
+                "topic": "revenue_total",
+                "value": 100,
+                "unit": "guan",
+                "confidence": "B",
+                "source_ref": "verified#1",
+            }
+        ]
+    ).to_csv(verified_facts, index=False)
+
+    pd.DataFrame(
+        [
+            {
+                "extract_id": "seed-1",
+                "period": "XINNING",
+                "region": "NATIONAL",
+                "topic": "revenue_total",
+                "value": 10,
+                "unit": "guan",
+                "confidence": "C",
+                "source_ref": "seed#1",
+            }
+        ]
+    ).to_csv(seed_facts, index=False)
+
+    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_FACTS_PATH", verified_facts)
+    monkeypatch.setattr("pipeline_end_to_end.SEED_FACTS_PATH", seed_facts)
+    monkeypatch.setattr("pipeline_end_to_end.VERIFIED_PANEL_PATH", verified_panel)
+    monkeypatch.setattr("pipeline_end_to_end.LEGACY_PANEL_PATH", legacy_panel)
+
+    panel = run_panel_mode("verified")
+
+    assert set(panel["period"]) == {"YUANFENG"}
+    assert verified_panel.exists()
+    assert legacy_panel.exists()
+
+
 def test_auto_mode_from_fixture_candidates_generates_valid_panel(
     tmp_path: Path,
     monkeypatch,
@@ -107,6 +159,7 @@ def test_auto_mode_from_fixture_candidates_generates_valid_panel(
     }
     assert expected_columns.issubset(panel.columns)
     assert not panel.duplicated(subset=["period", "region"]).any()
+    assert panel["region"].isin({"NATIONAL", "NORTH", "SOUTH"}).all()
 
     for col in ["share_liangshui_in_total", "share_shangshui_in_total"]:
         assert not panel[col].dropna().map(math.isinf).any()

@@ -1,4 +1,81 @@
 era_keywords:
+  XINNING:
+    - 熙宁
+    - 熙寧
+  YUANFENG:
+    - 元丰
+    - 元豐
+  SHAOSHENG:
+    - 绍圣
+    - 紹聖
+  HUIZONG:
+    - 徽宗
+    - 崇宁
+    - 崇寧
+    - 大观
+    - 大觀
+    - 政和
+
+topic_keywords:
+  shangshui:
+    - 商税
+    - 商稅
+    - 市舶
+    - 舶
+    - 互市
+    - 市易
+    - 均输
+    - 均輸
+  liangshui:
+    - 两税
+    - 兩稅
+  revenue_total:
+    - 总税
+    - 總稅
+    - 诸色课入
+    - 諸色課入
+    - 课入
+    - 課入
+  grain:
+    - 籴
+    - 糴
+    - 漕
+    - 漕运
+    - 漕運
+    - 京师
+    - 京師
+    - 边
+    - 邊
+
+region_keywords:
+  NATIONAL:
+    - 天下
+    - 诸路
+    - 諸路
+    - 全国
+    - 全國
+    - 京師
+  NORTH:
+    - 河北
+    - 河东
+    - 京东
+    - 京西
+    - 陕西
+    - 陕
+    - 关中
+    - 河朔
+  SOUTH:
+    - 两浙
+    - 江南
+    - 江西
+    - 福建
+    - 广南
+    - 荆湖
+    - 淮南
+
+notes:
+  - Region inference from Juan 186 is heuristic and provisional in this MVP.
+  - Auto panel includes only rows with inferred regions NATIONAL/NORTH/SOUTH.
   XINNING: ["熙宁", "熙寧"]
   YUANFENG: ["元丰", "元豐"]
   SHAOSHENG: ["绍圣", "紹聖"]
