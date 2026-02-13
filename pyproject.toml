@@ -1,0 +1,63 @@
+[build-system]
+requires = [
+  "setuptools>=68",
+  "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ns-song-fiscal-panel"
+version = "0.1.0"
+description = "Minimal traceable end-to-end pipeline for Song fiscal panel generation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas>=2.1.0",
+  "pyarrow>=14.0.0",
+  "pydantic>=2.5.0",
+  "requests>=2.31.0",
+  "beautifulsoup4>=4.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.2.0",
+]
+
+[project.scripts]
+run-song-pipeline = "pipeline_end_to_end:run_pipeline"
+run-songshi-juan186 = "ingest_songshi_juan186:main"
+
+[tool.pytest.ini_options]
+pythonpath = [
+  "src",
+]
+testpaths = [
+  "tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "N",
+  "UP",
+  "B",
+]
+
+[tool.setuptools]
+py-modules = [
+  "pipeline_end_to_end",
+  "ingest_songshi_juan186",
+]
+
+[tool.setuptools.packages.find]
+where = [
+  "src",
+]
