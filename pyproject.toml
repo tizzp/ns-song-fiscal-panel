@@ -1,5 +1,8 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = [
+  "setuptools>=68",
+  "wheel",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -24,18 +27,31 @@ dev = [
 run-song-pipeline = "pipeline_end_to_end:run_pipeline"
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
+pythonpath = [
+  "src",
+]
+testpaths = [
+  "tests",
+]
 
 [tool.ruff]
 line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "N", "UP", "B"]
+select = [
+  "E",
+  "F",
+  "I",
+  "N",
+  "UP",
+  "B",
+]
 
 [tool.setuptools]
-py-modules = ["pipeline_end_to_end"]
+py-modules = [
+  "pipeline_end_to_end",
+]
 
 [tool.setuptools.package-dir]
 "" = "src"

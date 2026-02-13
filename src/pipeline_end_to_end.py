@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Final
 
 import pandas as pd
 from pydantic import BaseModel, ValidationError
+
+LOGGER = logging.getLogger(__name__)
 
 REQUIRED_COLUMNS: Final[list[str]] = [
     "extract_id",
@@ -19,10 +22,20 @@ REQUIRED_COLUMNS: Final[list[str]] = [
     "source_ref",
 ]
 
+EXPECTED_TOPIC_COLUMNS: Final[list[str]] = [
+    "revenue_total",
+    "liangshui",
+    "shangshui",
+]
+
 BASE_DIR: Final[Path] = Path(__file__).resolve().parents[1]
 RAW_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_seed.csv"
-INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
-PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region.csv"
+INTERMEDIATE_PATH: Final[Path] = (
+    BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
+)
+PANEL_PATH: Final[Path] = (
+    BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region.csv"
+)
 
 
 class ExtractRecord(BaseModel):
@@ -54,6 +67,11 @@ def validate_rows(df: pd.DataFrame) -> None:
             raise ValueError(f"Invalid extract row: {row}") from exc
 
 
+def _safe_divide(numerator: pd.Series, denominator: pd.Series) -> pd.Series:
+    """Return numerator / denominator with NaN where denominator is not positive."""
+    return numerator.div(denominator.where(denominator > 0))
+
+
 def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
     """Aggregate extracts, pivot to wide, and compute share metrics."""
     grouped = (
@@ -62,11 +80,35 @@ def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
         .rename(columns={"value": "topic_value"})
     )
 
-    panel = grouped.pivot(index=["period", "region"], columns="topic", values="topic_value").reset_index()
+    panel = (
+        grouped.pivot(
+            index=["period", "region"],
+            columns="topic",
+            values="topic_value",
+        )
+        .reset_index()
+    )
     panel.columns.name = None
 
-    panel["share_liangshui_in_total"] = panel["liangshui"] / panel["revenue_total"]
-    panel["share_shangshui_in_total"] = panel["shangshui"] / panel["revenue_total"]
+    missing_topics = [
+        topic_name for topic_name in EXPECTED_TOPIC_COLUMNS if topic_name not in panel.columns
+    ]
+    if missing_topics:
+        LOGGER.warning(
+            "Missing topic columns after pivot; filling with 0 values: %s",
+            missing_topics,
+        )
+        for topic_name in missing_topics:
+            panel[topic_name] = 0.0
+
+    panel["share_liangshui_in_total"] = _safe_divide(
+        panel["liangshui"],
+        panel["revenue_total"],
+    )
+    panel["share_shangshui_in_total"] = _safe_divide(
+        panel["shangshui"],
+        panel["revenue_total"],
+    )
 
     panel = panel.sort_values(["period", "region"]).reset_index(drop=True)
     return panel
