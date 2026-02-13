@@ -1,0 +1,16 @@
+periods:
+  - XINNING
+  - YUANFENG
+  - SHAOSHENG
+  - HUIZONG
+regions:
+  - NATIONAL
+  - NORTH
+  - SOUTH
+topics:
+  - revenue_total
+  - liangshui
+  - shangshui
+derived_metrics:
+  - share_liangshui_in_total
+  - share_shangshui_in_total
