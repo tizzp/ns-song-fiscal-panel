@@ -1,0 +1,16 @@
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+
+# Generated ingestion outputs
+/data/01_raw/wikisource/
+/data/01_raw/extracts_songshi_juan186.csv
+
+# Generated pipeline outputs
+/data/02_intermediate/*
+!/data/02_intermediate/.gitkeep
+/data/03_primary/*
+!/data/03_primary/.gitkeep
+/data/04_features/*
+!/data/04_features/.gitkeep
