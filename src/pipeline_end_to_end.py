@@ -29,6 +29,11 @@ EXPECTED_TOPIC_COLUMNS: Final[list[str]] = ["revenue_total", "liangshui", "shang
 BASE_DIR: Final[Path] = Path(__file__).resolve().parents[1]
 VERIFIED_FACTS_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_songshi_juan186.csv"
 AUTO_FACTS_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "auto_facts_songshi_juan186.csv"
+SEED_FACTS_PATH: Final[Path] = BASE_DIR / "data" / "01_raw" / "extracts_seed.csv"
+INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
+AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
+VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
+LEGACY_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region.csv"
 INTERMEDIATE_PATH: Final[Path] = BASE_DIR / "data" / "02_intermediate" / "fact_numeric_extracts.parquet"
 AUTO_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_auto.csv"
 VERIFIED_PANEL_PATH: Final[Path] = BASE_DIR / "data" / "03_primary" / "panel_revenue_period_region_verified.csv"
@@ -78,6 +83,20 @@ def _filtered_for_panel(df: pd.DataFrame, mode: str) -> pd.DataFrame:
 
 def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
     """Aggregate extracts, pivot to wide, compute shares, and attach supporting ids."""
+    if extracts.empty:
+        return pd.DataFrame(
+            columns=[
+                "period",
+                "region",
+                "revenue_total",
+                "liangshui",
+                "shangshui",
+                "supporting_extract_ids",
+                "share_liangshui_in_total",
+                "share_shangshui_in_total",
+            ]
+        )
+
     grouped = (
         extracts.groupby(["period", "region", "topic"], as_index=False)
         .agg(topic_value=("value", "sum"), supporting_extract_ids=("extract_id", lambda x: "|".join(sorted(set(x)))))
@@ -86,6 +105,11 @@ def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
     value_panel = grouped.pivot(index=["period", "region"], columns="topic", values="topic_value").reset_index()
     value_panel.columns.name = None
 
+    ids_panel = grouped.groupby(["period", "region"], as_index=False).agg(
+        supporting_extract_ids=(
+            "supporting_extract_ids",
+            lambda x: "|".join(sorted(set("|".join(x).split("|")))),
+        )
     ids_panel = (
         grouped.groupby(["period", "region"], as_index=False)["supporting_extract_ids"]
         .agg(lambda x: "|".join(sorted(set("|".join(x).split("|")))))
@@ -104,11 +128,19 @@ def compute_panel(extracts: pd.DataFrame) -> pd.DataFrame:
     return panel
 
 
+def _resolve_verified_input() -> Path:
+    """Return verified facts path, falling back to seed facts for compatibility."""
+    if VERIFIED_FACTS_PATH.exists() and VERIFIED_FACTS_PATH.stat().st_size > 0:
+        return VERIFIED_FACTS_PATH
+    return SEED_FACTS_PATH
+
+
 def run_panel_mode(mode: str) -> pd.DataFrame:
     """Run a single panel mode: auto or verified."""
     if mode not in {"auto", "verified"}:
         raise ValueError("mode must be one of {'auto','verified'}")
 
+    input_path = AUTO_FACTS_PATH if mode == "auto" else _resolve_verified_input()
     input_path = AUTO_FACTS_PATH if mode == "auto" else VERIFIED_FACTS_PATH
     output_path = AUTO_PANEL_PATH if mode == "auto" else VERIFIED_PANEL_PATH
 
@@ -141,6 +173,8 @@ def run_panel_mode(mode: str) -> pd.DataFrame:
     panel = compute_panel(filtered)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     panel.to_csv(output_path, index=False)
+    if mode == "verified":
+        panel.to_csv(LEGACY_PANEL_PATH, index=False)
     return panel
 
 

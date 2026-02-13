@@ -62,7 +62,13 @@ run-songshi-juan186-verified
 run-song-pipeline
 ```
 
-This command runs the **verified** mode.
+This command runs the **verified** mode and keeps compatibility with older flows:
+
+- Uses `data/01_raw/extracts_songshi_juan186.csv` when available.
+- Falls back to `data/01_raw/extracts_seed.csv` when verified facts are absent.
+- Writes both:
+  - `data/03_primary/panel_revenue_period_region_verified.csv`
+  - `data/03_primary/panel_revenue_period_region.csv` (legacy path)
 
 ## Output locations (generated, not committed)
 

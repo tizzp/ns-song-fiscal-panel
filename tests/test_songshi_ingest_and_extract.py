@@ -47,6 +47,11 @@ def test_fetch_creates_nonempty_txt(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     """Fetcher should write non-empty plain text output."""
     fixture_html = Path("tests/fixtures/juan186_sample.html").read_text(encoding="utf-8")
 
+    def _fake_download_html(url: str) -> str:
+        assert "wikisource" in url
+        return fixture_html
+
+    monkeypatch.setattr("ingest.wikisource_fetch._download_html", _fake_download_html)
     def _fake_get(*args: object, **kwargs: object) -> _DummyResponse:
         return _DummyResponse(fixture_html)
 
